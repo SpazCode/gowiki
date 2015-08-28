@@ -1,6 +1,6 @@
 <h1>{{.Title}}</h1>
 
-{{ $pages = Split(.Body) }}
+{{ $pages = Split(.Body, " ") }}
 {{range $index, $page := $pages }}
 	<p>[<a href="/edit/{{}}">edit</a>]</p>
 {{ end }}

@@ -11,7 +11,7 @@ import (
 )
 
 var templates = template.Must(template.ParseFiles("templates/edit.html", "templates/view.html"))
-var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9]+)$")
+var validPath = regexp.MustCompile("^/(edit|save|view|FrontPage)/([a-zA-Z0-9]+)$")
 var fileNames = []string{}
 var fileNameStrings = ""
 
@@ -57,30 +57,25 @@ func getTitle(w http.ResponseWriter, r *http.Request) (string, error) {
 }
 
 func viewHandler(w http.ResponseWriter, r *http.Request, title string) {
-	fmt.Println(title)
-	if title != "FrontPage" {
-		p, err :=loadPage(title)
-		if err != nil {
-			http.Redirect(w, r, "/edit/"+title, http.StatusFound)
-			return
-		}
-		renderTemplate(w, "view",p)
-	} else {
-		p := &Page{Title: "Root", Body: []byte(fileNameStrings)}	
-		renderTemplate(w, "root",p)
+	p, err :=loadPage(title)
+	if err != nil {
+		http.Redirect(w, r, "/edit/"+title, http.StatusFound)
+		return
 	}
+	renderTemplate(w, "view",p)
+}
+
+func rootHandler(w http.ResponseWriter, r *http.Request, title string) {
+	p := &Page{Title: "Root", Body: []byte(fileNameStrings)}	
+	renderTemplate(w, "root",p)
 }
 
 func editHandler(w http.ResponseWriter, r *http.Request, title string) {
-	if title != "FrontPage" {
-		p, err :=loadPage(title)
-		if err != nil {
-			p = &Page{Title: title}
-		}
-		renderTemplate(w, "edit",p)
-	} else {
-		http.Redirect(w, r, "/view/FrontPage", http.StatusFound)
+	p, err :=loadPage(title)
+	if err != nil {
+		p = &Page{Title: title}
 	}
+	renderTemplate(w, "edit",p)
 }
 
 func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
@@ -114,9 +109,9 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
 
 func main() {
 	setup()
+	http.HandleFunc("/FrontPage", makeHandler(rootHandler))
 	http.HandleFunc("/view/", makeHandler(viewHandler))
 	http.HandleFunc("/edit/", makeHandler(editHandler))
 	http.HandleFunc("/save/", makeHandler(saveHandler))
 	http.ListenAndServe(":8080", nil)
 }
-

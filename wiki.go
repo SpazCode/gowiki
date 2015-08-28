@@ -6,10 +6,27 @@ import (
 	"io/ioutil"
 	"net/http"
 	"errors"
+	"fmt"
+	"strings"
 )
 
 var templates = template.Must(template.ParseFiles("templates/edit.html", "templates/view.html"))
 var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9]+)$")
+var fileNames = []string{}
+var fileNameStrings = ""
+
+func setup() {
+	var files,_ = ioutil.ReadDir("./files")
+	for _,file := range files {
+		fmt.Println("File Found: " + file.Name())
+		name := strings.Replace(file.Name(), ".txt", "", 1)
+		fileNameStrings = fileNameStrings + name + " "
+		fileNames = append(fileNames, name)
+	}
+	var tplFuncMap = make(template.FuncMap)
+	tplFuncMap["Split"] = strings.Split
+	templates = template.Must(template.New("").Funcs(tplFuncMap).ParseFiles("templates/edit.html", "templates/view.html"))
+}
 
 type Page struct {
 	Title string
@@ -40,20 +57,30 @@ func getTitle(w http.ResponseWriter, r *http.Request) (string, error) {
 }
 
 func viewHandler(w http.ResponseWriter, r *http.Request, title string) {
-	p, err :=loadPage(title)
-	if err != nil {
-		http.Redirect(w, r, "/edit/"+title, http.StatusFound)
-		return
+	fmt.Println(title)
+	if title != "FrontPage" {
+		p, err :=loadPage(title)
+		if err != nil {
+			http.Redirect(w, r, "/edit/"+title, http.StatusFound)
+			return
+		}
+		renderTemplate(w, "view",p)
+	} else {
+		p := &Page{Title: "Root", Body: []byte(fileNameStrings)}	
+		renderTemplate(w, "root",p)
 	}
-	renderTemplate(w, "view",p)
 }
 
 func editHandler(w http.ResponseWriter, r *http.Request, title string) {
-	p, err :=loadPage(title)
-	if err != nil {
-		p = &Page{Title: title}
+	if title != "FrontPage" {
+		p, err :=loadPage(title)
+		if err != nil {
+			p = &Page{Title: title}
+		}
+		renderTemplate(w, "edit",p)
+	} else {
+		http.Redirect(w, r, "/view/FrontPage", http.StatusFound)
 	}
-	renderTemplate(w, "edit",p)
 }
 
 func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
@@ -86,6 +113,7 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
 }
 
 func main() {
+	setup()
 	http.HandleFunc("/view/", makeHandler(viewHandler))
 	http.HandleFunc("/edit/", makeHandler(editHandler))
 	http.HandleFunc("/save/", makeHandler(saveHandler))

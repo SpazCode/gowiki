@@ -1,5 +1,12 @@
-<h1>{{.Title}}</h1>
+{{define "viewPage"}}
+<html>
 
-<p>[<a href="/edit/{{.Title}}">edit</a>]</p>
+<body>
+  <h1>{{.Title}}</h1>
+  <p>[<a href="/edit/{{.Title}}">edit</a>]</p>
+  <div>{{printf "%s" .Body}}</div>
+  <p>[<a href="/">root</a>]</p>
+</body>
 
-<div>{{printf "%s" .Body}}</div>
+</html>
+{{end}}

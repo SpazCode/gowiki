@@ -1,6 +1,20 @@
-<h1>{{.Title}}</h1>
+{{define "index"}}
+<html>
 
-{{ $pages = Split(.Body, " ") }}
-{{range $index, $page := $pages }}
-	<p>[<a href="/edit/{{}}">edit</a>]</p>
-{{ end }}
+<body>
+  <h1>Index</h1>
+  <div>
+    <p>[<a href="/new">New Page</a>]</p>
+  </div>
+  <div>
+    <h3>Pages</h3>
+    <ol>
+      {{range $index, $page := .Pages }}
+      	<li><a href="/view/{{$page}}">{{$page}}</a></li>
+      {{ end }}
+    </ol>
+  </div>
+</body>
+
+</html>
+{{end}}

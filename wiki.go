@@ -10,27 +10,27 @@ import (
 	"strings"
 )
 
-var templates = template.Must(template.ParseFiles("templates/edit.html", "templates/view.html"))
-var validPath = regexp.MustCompile("^/(edit|save|view|FrontPage)/([a-zA-Z0-9]+)$")
-var fileNames = []string{}
-var fileNameStrings = ""
+var index = &Index{Pages: []string{}}
+var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9]+)$")
+var templates = template.Must(template.ParseGlob("templates/*"))
 
 func setup() {
+	index = &Index{Pages: []string{}}
 	var files,_ = ioutil.ReadDir("./files")
 	for _,file := range files {
-		fmt.Println("File Found: " + file.Name())
+		fmt.Println("- File Found: " + file.Name())
 		name := strings.Replace(file.Name(), ".txt", "", 1)
-		fileNameStrings = fileNameStrings + name + " "
-		fileNames = append(fileNames, name)
+		index.Pages = append(index.Pages, name)
 	}
-	var tplFuncMap = make(template.FuncMap)
-	tplFuncMap["Split"] = strings.Split
-	templates = template.Must(template.New("").Funcs(tplFuncMap).ParseFiles("templates/edit.html", "templates/view.html"))
 }
 
 type Page struct {
 	Title string
 	Body []byte
+}
+
+type Index struct {
+	Pages []string
 }
 
 func (p *Page) save() error {
@@ -57,6 +57,7 @@ func getTitle(w http.ResponseWriter, r *http.Request) (string, error) {
 }
 
 func viewHandler(w http.ResponseWriter, r *http.Request, title string) {
+	fmt.Println("Viewing " + title)
 	p, err :=loadPage(title)
 	if err != nil {
 		http.Redirect(w, r, "/edit/"+title, http.StatusFound)
@@ -65,12 +66,25 @@ func viewHandler(w http.ResponseWriter, r *http.Request, title string) {
 	renderTemplate(w, "view",p)
 }
 
-func rootHandler(w http.ResponseWriter, r *http.Request, title string) {
-	p := &Page{Title: "Root", Body: []byte(fileNameStrings)}	
-	renderTemplate(w, "root",p)
+func newHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Creating New")
+	err := templates.ExecuteTemplate(w, "newPage", nil)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func rootHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Loading Index")
+	setup()
+	err := templates.ExecuteTemplate(w, "index", index)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func editHandler(w http.ResponseWriter, r *http.Request, title string) {
+	fmt.Println("Editing: " + title)
 	p, err :=loadPage(title)
 	if err != nil {
 		p = &Page{Title: title}
@@ -79,14 +93,19 @@ func editHandler(w http.ResponseWriter, r *http.Request, title string) {
 }
 
 func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
+	pageTitle := title
+	if title == "new" {
+		pageTitle = r.FormValue("title")
+	}
 	body := r.FormValue("body")
-	p := &Page{Title: title, Body: []byte(body)}
+	fmt.Println("Saving: " + pageTitle)
+	p := &Page{Title: pageTitle, Body: []byte(body)}
 	err := p.save()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/view/"+title, http.StatusFound)
+	http.Redirect(w, r, "/view/"+pageTitle, http.StatusFound)
 }
 
 func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.HandlerFunc{
@@ -101,15 +120,15 @@ func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.Handl
 }
 
 func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
-	err := templates.ExecuteTemplate(w, "templates/" + tmpl + ".html", p)
+	err := templates.ExecuteTemplate(w, tmpl + "Page", p)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func main() {
-	setup()
-	http.HandleFunc("/FrontPage", makeHandler(rootHandler))
+	http.HandleFunc("/", rootHandler)
+	http.HandleFunc("/new", newHandler)
 	http.HandleFunc("/view/", makeHandler(viewHandler))
 	http.HandleFunc("/edit/", makeHandler(editHandler))
 	http.HandleFunc("/save/", makeHandler(saveHandler))
